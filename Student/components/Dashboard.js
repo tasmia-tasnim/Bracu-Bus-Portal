@@ -344,117 +344,7 @@ function UpcomingBus({ currentUser }) {
   );
 }
 
-function LiveMap({ currentUser }) {
-  const mapRef = React.useRef(null);
-  const mapInstanceRef = React.useRef(null);
-  const busMarkerRef = React.useRef(null);
-  const [busStatus, setBusStatus] = React.useState('Loading...');  // ← add this
 
-  const BRACU = { lat: 23.7807, lng: 90.4394 };
-
-  React.useEffect(() => {
-    if (mapInstanceRef.current) return;
-    const map = L.map(mapRef.current).setView([BRACU.lat, BRACU.lng], 12);
-    mapInstanceRef.current = map;
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors"
-    }).addTo(map);
-    L.marker([BRACU.lat, BRACU.lng], {
-      icon: L.divIcon({
-        html: '<div style="font-size:1.5rem">🏫</div>',
-        className: "", iconSize: [30, 30], iconAnchor: [15, 15]
-      })
-    }).addTo(map).bindPopup("<strong>BRAC University</strong>");
-    setTimeout(() => {
-      if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
-    }, 300);
-  }, []);
-
-  React.useEffect(() => {
-    if (!currentUser?.plan_route_id || !mapInstanceRef.current) return;
-
-    async function fetchLiveLocation() {
-      try {
-        const res = await fetch(
-          `http://localhost:9255/api/bus-locations/${currentUser.plan_route_id}`
-        );
-        const data = await res.json();
-
-        if (!Array.isArray(data) || data.length === 0) {
-          setBusStatus('🔴 No bus data available');  // ← update status
-          return;
-        }
-
-        const bus = data[0];
-        if (!bus.latitude || !bus.longitude) return;
-
-        const lat = Number(bus.latitude);
-        const lng = Number(bus.longitude);
-
-        // ← update status from simulator's speed field
-        const speed = bus.speed || 0;
-        const lastUpdated = new Date(bus.last_updated).toLocaleTimeString();
-
-        if (speed === 0) {
-          setBusStatus(`🟡 Bus is stationary — Last updated: ${lastUpdated}`);
-        } else {
-          setBusStatus(`🟢 Bus is moving at ${speed} km/h — Last updated: ${lastUpdated}`);
-        }
-
-        if (!busMarkerRef.current) {
-          busMarkerRef.current = L.marker([lat, lng], {
-            icon: L.divIcon({
-              html: '<div style="font-size:1.8rem">🚌</div>',
-              className: "", iconSize: [36, 36], iconAnchor: [18, 18]
-            })
-          }).addTo(mapInstanceRef.current);
-        } else {
-          busMarkerRef.current.setLatLng([lat, lng]);
-        }
-
-        busMarkerRef.current.setPopupContent(`
-          <strong>${bus.bus_id?.bus_number || 'Bus'}</strong><br/>
-          Route: ${bus.route_id?.route_name || currentUser.plan_route_name}<br/>
-          Speed: ${speed} km/h<br/>
-          Last Updated: ${lastUpdated}
-        `);
-
-        mapInstanceRef.current.setView([lat, lng], 13);
-      } catch (error) {
-        setBusStatus('🔴 Failed to fetch location');
-        console.error("Failed to fetch live bus location:", error);
-      }
-    }
-
-    fetchLiveLocation();
-    const interval = setInterval(fetchLiveLocation, 5000);
-    return () => clearInterval(interval);
-  }, [currentUser?.plan_route_id]);
-
-  return (
-    <div className="live-map-wrapper">
-      <h3 className="upcoming-title">
-        📍 Live Bus Location
-        {currentUser?.plan_route_name && (
-          <span className="map-route-badge">{currentUser.plan_route_name}</span>
-        )}
-      </h3>
-
-      {/* ← add status bar */}
-      <div className="bus-status-bar">
-        {busStatus}
-      </div>
-
-      {!currentUser?.plan_route_id && (
-        <p className="empty-text">Choose a plan to see your route on the map.</p>
-      )}
-      <div ref={mapRef} style={{
-        width: "100%", height: "320px",
-        borderRadius: "12px", zIndex: 1, marginTop: "0.75rem"
-      }}></div>
-    </div>
-  );
-}
 
 function Dashboard({ setActive, onChoosePlan, announcements, setShowReport, currentUser, setShowScanner, isPlanLocked }) {
   const [hasPaidBooking, setHasPaidBooking] = React.useState(false);
@@ -489,7 +379,7 @@ function Dashboard({ setActive, onChoosePlan, announcements, setShowReport, curr
         hasPaidBooking={hasPaidBooking}
       />
       {currentUser && <UpcomingBus currentUser={currentUser} />}
-      {currentUser && <LiveMap currentUser={currentUser} />}
+
       <AnnouncementList announcements={announcements} currentUser={currentUser} />
       {currentUser && <MyFeedbacks currentUser={currentUser} />}
       <Weather />
